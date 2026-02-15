@@ -68,11 +68,29 @@ def find_git_repos(base_path: str, exclude_patterns: List[str], max_repos: int =
     if not base.exists():
         return repos
     
+    # Convert exclude patterns to a set for faster lookup
+    exclude_set = set(exclude_patterns)
+    
     for path in base.rglob('.git'):
         repo_path = path.parent
         
-        # Check if excluded
-        if any(pattern in str(repo_path) for pattern in exclude_patterns):
+        # Check if excluded - match exact directory names in path parts
+        path_parts = repo_path.parts
+        should_exclude = False
+        for part in path_parts:
+            if part in exclude_set:
+                should_exclude = True
+                break
+            # Also check if any pattern matches as substring in part
+            # (handles cases like .git, __pycache__, etc.)
+            for pattern in exclude_set:
+                if pattern in part:
+                    should_exclude = True
+                    break
+            if should_exclude:
+                break
+        
+        if should_exclude:
             continue
         
         try:
@@ -376,6 +394,11 @@ Examples:
     parser.add_argument('-c', '--config', help='Path to config file')
     parser.add_argument('--max-repos', type=int, default=50, help='Maximum repositories to scan')
     parser.add_argument('--export-json', action='store_true', help='Export activity data to a timestamped JSON file')
+    parser.add_argument('--exclude', action='append', dest='exclude_patterns',
+                        help='Directory name or pattern to exclude (can be used multiple times). '
+                             'Examples: --exclude node_modules --exclude vendor')
+    parser.add_argument('--exclude-from-config', action=argparse.BooleanOptionalAction, default=True,
+                        help='Load exclude patterns from config file (default: True, use --no-exclude-from-config to disable)')
     
     args = parser.parse_args()
     
@@ -390,7 +413,24 @@ Examples:
     
     days = args.days or config.get('default_days', 30)
     max_repos = args.max_repos or config.get('max_repos', 50)
-    exclude_patterns = config.get('exclude_patterns', ['.git', 'node_modules'])
+    
+    # Build exclude patterns list
+    # Default exclusions to avoid scanning dependency directories
+    default_excludes = ['node_modules', '.git', '__pycache__', '.venv', 'venv']
+    
+    # Start with config exclude patterns if enabled
+    exclude_patterns = []
+    if args.exclude_from_config:
+        exclude_patterns = config.get('exclude_patterns', default_excludes)
+    else:
+        exclude_patterns = default_excludes[:]
+    
+    # Merge CLI-provided exclude patterns (CLI takes precedence)
+    if args.exclude_patterns:
+        # Add CLI exclusions to the list (avoiding duplicates)
+        for pattern in args.exclude_patterns:
+            if pattern not in exclude_patterns:
+                exclude_patterns.append(pattern)
     
     print(f"{Fore.CYAN}🔍 Scanning for git repositories...{Style.RESET_ALL}")
     

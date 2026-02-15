@@ -35,6 +35,12 @@ python src/git_dashboard.py --days 7
 
 # Export activity data to JSON
 python src/git_dashboard.py --export-json
+
+# Exclude specific directories (can be used multiple times)
+python src/git_dashboard.py --exclude node_modules --exclude vendor
+
+# Use only CLI exclusions (ignore config file exclusions)
+python src/git_dashboard.py --exclude .git --no-exclude-from-config
 ```
 
 ### JSON Export
@@ -58,6 +64,31 @@ Edit `config/settings.yaml` to customize:
 - Directories to scan
 - Default time range
 - Output preferences
+- Exclude patterns for directories to skip
+
+### Exclude Patterns
+
+By default, the scanner excludes common dependency and cache directories:
+- `node_modules` - Node.js dependencies
+- `.git` - Git internals
+- `__pycache__` - Python cache
+- `.venv`, `venv` - Python virtual environments
+- `vendor` - Vendor directories (Go, PHP, etc.)
+
+You can customize exclusions in `config/settings.yaml`:
+
+```yaml
+exclude_patterns:
+  - .git
+  - node_modules
+  - venv
+  - __pycache__
+  - vendor
+  - target  # Rust build directory
+  - dist    # Build output
+```
+
+Or use the `--exclude` CLI option to add exclusions on-the-fly.
 
 ## Example Output
 
