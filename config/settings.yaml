@@ -1,0 +1,41 @@
+# Git Activity Dashboard Configuration
+
+# Directories to scan for git repositories
+scan_directories:
+  - ~/projects
+  - ~/code
+  - ~/workspace
+  - .
+
+# Default number of days to analyze
+default_days: 30
+
+# Maximum number of repositories to scan (prevents long scans)
+max_repos: 50
+
+# Patterns to exclude when scanning (directories containing these will be skipped)
+exclude_patterns:
+  - .git
+  - node_modules
+  - venv
+  - env
+  - __pycache__
+  - .venv
+  - vendor
+  - target
+  - build
+  - dist
+
+# Output preferences
+output:
+  # Show commit messages in output
+  show_commit_messages: true
+  # Number of recent commits to display
+  max_recent_commits: 15
+  # Show file change statistics
+  show_file_stats: true
+
+# Repository name filters (optional - only scan repos matching these patterns)
+# include_patterns:
+#   - myproject
+#   - work-
