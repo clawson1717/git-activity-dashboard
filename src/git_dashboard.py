@@ -7,6 +7,7 @@ import os
 import sys
 import argparse
 import subprocess
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -210,6 +211,91 @@ def format_stat(label: str, value: int, color: str = Fore.WHITE) -> str:
     return f"  {Fore.DIM}{label:20s}{Style.RESET_ALL} {color}{Style.BRIGHT}{value:>8d}{Style.RESET_ALL}"
 
 
+def export_to_json(stats_list: List[Dict], days: int, output_dir: str = None) -> str:
+    """Export git activity data to a timestamped JSON file."""
+    # Prepare output directory
+    if output_dir is None:
+        output_dir = os.path.expanduser('~/.git-dashboard/output')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"git_activity_{timestamp}.json"
+    filepath = os.path.join(output_dir, filename)
+    
+    # Calculate aggregate statistics
+    total_commits = sum(s['total_commits'] for s in stats_list)
+    total_repos = len(stats_list)
+    active_repos = sum(1 for s in stats_list if s['total_commits'] > 0)
+    
+    # Aggregate daily activity across all repos
+    all_daily = defaultdict(int)
+    for stat in stats_list:
+        for date, count in stat['daily_commits'].items():
+            all_daily[date] += count
+    
+    # Calculate file changes totals
+    total_files_changed = sum(s['files_changed'] for s in stats_list)
+    total_insertions = sum(s['insertions'] for s in stats_list)
+    total_deletions = sum(s['deletions'] for s in stats_list)
+    
+    # Prepare repository data (clean, serializable format)
+    repositories = []
+    for stat in stats_list:
+        # Convert commits to serializable format
+        serializable_commits = []
+        for commit in stat['commits']:
+            serializable_commits.append({
+                'hash': commit['hash'],
+                'message': commit['message'],
+                'author': commit['author'],
+                'date': commit['date'].isoformat() if isinstance(commit['date'], datetime) else commit['date']
+            })
+        
+        # Sort daily commits chronologically
+        sorted_daily = dict(sorted(stat['daily_commits'].items()))
+        
+        repositories.append({
+            'name': stat['name'],
+            'path': stat['path'],
+            'total_commits': stat['total_commits'],
+            'files_changed': stat['files_changed'],
+            'insertions': stat['insertions'],
+            'deletions': stat['deletions'],
+            'daily_commits': sorted_daily,
+            'recent_commits': serializable_commits
+        })
+    
+    # Sort repositories by commit count (descending)
+    repositories.sort(key=lambda x: x['total_commits'], reverse=True)
+    
+    # Build the JSON structure
+    export_data = {
+        'metadata': {
+            'generated_at': datetime.now().isoformat(),
+            'analysis_period_days': days,
+            'version': '1.0'
+        },
+        'summary': {
+            'repositories_scanned': total_repos,
+            'active_repositories': active_repos,
+            'total_commits': total_commits,
+            'total_files_changed': total_files_changed,
+            'total_insertions': total_insertions,
+            'total_deletions': total_deletions,
+            'net_lines_changed': total_insertions - total_deletions
+        },
+        'daily_activity': dict(sorted(all_daily.items())),
+        'repositories': repositories
+    }
+    
+    # Write JSON file with nice formatting
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(export_data, f, indent=2, ensure_ascii=False)
+    
+    return filepath
+
+
 def display_dashboard(stats_list: List[Dict], days: int):
     """Display the activity dashboard."""
     # Header
@@ -282,12 +368,14 @@ Examples:
   python src/git_dashboard.py                    # Use default config
   python src/git_dashboard.py -p ~/projects      # Scan specific directory
   python src/git_dashboard.py -d 7               # Show last 7 days
+  python src/git_dashboard.py --export-json      # Export data to JSON
         '''
     )
     parser.add_argument('-p', '--path', help='Directory to scan for git repositories')
     parser.add_argument('-d', '--days', type=int, default=30, help='Number of days to analyze (default: 30)')
     parser.add_argument('-c', '--config', help='Path to config file')
     parser.add_argument('--max-repos', type=int, default=50, help='Maximum repositories to scan')
+    parser.add_argument('--export-json', action='store_true', help='Export activity data to a timestamped JSON file')
     
     args = parser.parse_args()
     
@@ -330,6 +418,12 @@ Examples:
     
     # Display dashboard
     display_dashboard(stats_list, days)
+    
+    # Export to JSON if requested
+    if args.export_json:
+        print(f"{Fore.CYAN}💾 Exporting data to JSON...{Style.RESET_ALL}")
+        output_path = export_to_json(stats_list, days)
+        print(f"{Fore.GREEN}✓ JSON export saved to: {output_path}{Style.RESET_ALL}")
 
 
 if __name__ == '__main__':

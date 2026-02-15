@@ -32,7 +32,25 @@ python src/git_dashboard.py --path /path/to/projects
 
 # Show last N days (default: 30)
 python src/git_dashboard.py --days 7
+
+# Export activity data to JSON
+python src/git_dashboard.py --export-json
 ```
+
+### JSON Export
+
+The `--export-json` option exports all collected git activity data to a timestamped JSON file in `~/.git-dashboard/output/`. This enables integration with other tools and custom dashboard building.
+
+**JSON Structure:**
+- `metadata`: Export timestamp, analysis period, and version
+- `summary`: Aggregated statistics (repositories scanned, total commits, files changed, lines added/removed)
+- `daily_activity`: Daily commit counts across all repositories
+- `repositories`: Detailed per-repository data including:
+  - Repository name and path
+  - Commit counts
+  - Files changed and line statistics
+  - Daily activity breakdown
+  - Recent commits with hash, message, author, and date
 
 ## Configuration
 
